@@ -198,4 +198,4 @@ Writing a simple shell is not a small problem, so we need to tackle it step by s
 * The last step should be to support background process, which is the hardest advanced feature, and desgin test cases for background processes with both builtin and external commands
 
 
-The Environment used for this assignment is Ubuntu 16.04 and GDB as debugger. 
+The Environment used for this assignment is Ubuntu 14.04 and GDB as debugger. 
