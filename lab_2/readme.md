@@ -30,7 +30,7 @@ void start_shell() {
     do {
         printf("> "); // print the prompt
         command = read_command(); // read the command 
-        args = parse_command(); // parse the command into array of arguments
+        args = parse_command(command); // parse the command into array of arguments
         status = execute_command(args); // execute the command with args
         puts("");
     } while(status);
