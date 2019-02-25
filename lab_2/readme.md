@@ -156,8 +156,8 @@ int execute_pipe(char **args) {
     
     if (pipe(fd) == -1) {
         /* 
-        create a pipe. The array fd is used to return 2 file descriptors referring to the end of the pipe
-        fd[0] referes to the read end of the file, and fd[1] refers to the write end of the file. Data written 
+        create a pipe. The array fd is used to return 2 file descriptors referring to the ends of the pipe.
+        fd[0] refers to the read end of the file, and fd[1] refers to the write end of the file. Data written 
         to the write end of the pipe is buffered by the kernel until it is read from the read end of the pipe.
 
         pipe(fd) returns -1 on failure
@@ -175,12 +175,15 @@ int execute_pipe(char **args) {
             fprintf(stderr, "error closing the write end\n");
             return EXIT_FAILURE;
         }
+
+        dup2(fd[0], STDIN_FILENO);
         /* read input from the read end and execute */
     } else {
         if (close(fd[0]) == - 1) {
             fprintf(stderr, "error closing the read end\n");
             return EXIT_FAILURE;
         }
+        dup2(fd[1], STDOUT_FILENO);
         /* execute and write outputs to the write end */
     }
     return EXIT_SUCCESS; 
