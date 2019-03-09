@@ -61,7 +61,6 @@ int echo(char **args) {
 }
 
 int path(char **args) {
-
     if (args[1] == NULL) {
         PATH = "";
     } else {

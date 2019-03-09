@@ -149,26 +149,6 @@ int execute_command(char **argsList) {
     } else if ((left = detect_left(argsList)) != -1 | (right = detect_right(argsList)) != -1) {
         status = redirect(left, right, argsList);
     } else if ((index = detect_parallel(argsList)) != -1) {
-        /* create two arrays of arguments */
-        /*
-        char *args1[index];
-        char *args2[(n - index)];
-
-        int i = 0;
-        for (; i < index; i++) {
-            args1[i] = argsList[i];
-        }
-        args1[i++] = NULL;
-
-        int j = 0;
-        for (; argsList[i] != NULL; i++, j++) {
-            args2[j] = argsList[i];
-        }
-        args2[j] = NULL;
-
-        status = execute_parallel(args1, args2);
-        */
-
         /* get the indices of the pipe character in argsList */
         int indices[n];
         indices[0] = index;
@@ -178,7 +158,7 @@ int execute_command(char **argsList) {
                 indices[j++] = i;
             }
         }
-        status = execute_parallel_new(argsList, indices, (j + 1), n);
+        status = execute_parallel(argsList, indices, (j + 1), n);
     } else {
         if ((index = detect_builtins(argsList[0])) != -1) {
             if (bg) {
@@ -422,48 +402,8 @@ int redirect(int left, int right, char **argsList) {
     return 1;
 }
 
-int execute_parallel(char **args1, char **args2) {
-    /*
-    arguments: 2 arrays of arguments
-    return: 1
-    */
 
-    pid_t pid1;
-    pid_t pid2;
-    int status;
-    int index;
-
-    if ((pid1 = fork()) == -1) {
-        fprintf(stderr, "fork error %s \n", strerror(errno));
-    } else if (pid1 == 0) {
-        if ((index = detect_builtins(args1[0])) != -1) {
-            builtin_commands[index](args1);
-            exit(0);
-        } else {
-            execvp(args1[0], args1);
-            fprintf(stderr, "failed to execute command 1: %s\n", strerror(errno));
-            exit(1);
-        }
-    } else {
-        if ((pid2 = fork()) == -1) {
-            fprintf(stderr, "fork error %s \n", strerror(errno));
-        } else if (pid2 == 0) {
-            if ((index = detect_builtins(args2[0])) != -1) {
-                builtin_commands[index](args2);
-                exit(0);
-            } else {
-                execvp(args2[0], args2);
-                fprintf(stderr, "failed to execute command 2: %s\n", strerror(errno));
-                exit(1);
-            }
-        } else {
-            waitpid(pid2, &status, WUNTRACED);
-        }
-    }
-    return 1;
-}
-
-int execute_parallel_new(char **argsList, int *indices, int n_procs, int n_args) {
+int execute_parallel(char **argsList, int *indices, int n_procs, int n_args) {
     /*
      arguments:
      argsList is an array of arguments from user
