@@ -144,28 +144,7 @@ int execute_command(char **argsList) {
                 indices[j++] = i;
             }
         }
-        status = execute_pipe_new(argsList, indices, j, n);
-        
-
-        /* create two arrays of arguments */
-        /*
-        char *args1[index];
-        char *args2[(n - index)];
-
-        int i = 0;
-        for (; i < index; i++) {
-            args1[i] = argsList[i];
-        }
-        args1[i++] = NULL;
-
-        int j = 0;
-        for (; argsList[i] != NULL; i++, j++) {
-            args2[j] = argsList[i];
-        }
-        args2[j] = NULL;
-
-        status = execute_pipe(args1, args2);
-        */
+        status = execute_pipe(argsList, indices, j, n);
     } else if ((left = detect_left(argsList)) != -1 | (right = detect_right(argsList)) != -1) {
         status = redirect(left, right, argsList);
     } else if ((index = detect_parallel(argsList)) != -1) {
@@ -244,7 +223,7 @@ int execute_external_command(char **argsList, int bg) {
 Advance features
 */
 
-int execute_pipe_new(char **argsList, int *indices, int n_pipes, int n_args) {
+int execute_pipe(char **argsList, int *indices, int n_pipes, int n_args) {
     /*
     arguments:
     argsList is an array of arguments from user
@@ -341,86 +320,11 @@ int execute_pipe_new(char **argsList, int *indices, int n_pipes, int n_args) {
 
     for (int j = 0; j < n_pipes + 1; j++) {
         waitpid(lPID[j], &status, WUNTRACED);
-        printf("%d\n", lPID[j]);
     }
 
     return 1;
 }
 
-int execute_pipe(char **args1, char **args2) {
-    /*
-    arguments: 2 arrays of arguments
-    Execute a pipe with the 2 arrays of arguments
-    return: 1
-    */
-
-    int fd[2];
-    int index;
-    int status;
-    pid_t pid1;
-    pid_t pid2;
-
-    if (pipe(fd) == -1) {
-        fprintf(stderr, "pipe error %s\n", strerror(errno));
-    } else {
-        /*
-        There are two cases we need to take care of: builtin command and external command
-        There are only 4 builtins that can be used in a pipe: dir, echo, environ, help;
-        these commands only happen in the write-end of the pipe.
-        Hence we just need to check if args1[0] is a builtin
-        */
-
-        if ((pid1 = fork()) == -1) {
-            fprintf(stderr, "fork error %s\n", strerror(errno));
-        } else if (pid1 == 0) {
-            /*
-            At the child process, we close the read-end, duplicate the write-end into STDOUT_FILENO
-            Then we check if args1[0] is builtin, if it is, call the builtin and
-            exit(0), else if it is external call execvp
-            */
-
-            close(fd[0]);
-            dup2(fd[1], STDOUT_FILENO);
-            close(fd[1]);
-            if ((index = detect_builtins(args1[0])) != -1) {
-                builtin_commands[index](args1);
-                exit(0);
-            } else {
-                execvp(args1[0], args1);
-                fprintf(stderr, "failed to execute command 1: %s\n", strerror(errno));
-                exit(1);
-            }
-        } else {
-            /*
-            At the parent process, we have to fork again or else the shell process will be overwritten by execvp.
-            At the child process of the second fork, close the write-end, duplicate the read-end into STDIN_FILENO,
-            and execute.
-            Finally, at the parent process of the second fork, close the read-end, close the write-end and
-            reap the child process.
-            */
-
-            if ((pid2 = fork()) == -1) {
-                fprintf(stderr, "fork error %s\n", strerror(errno));
-            } else if (pid2 == 0) {
-                close(fd[1]);
-                dup2(fd[0], STDIN_FILENO);
-                close(fd[0]);
-                execvp(args2[0], args2);
-                fprintf(stderr, "failed to execute command 2: %s\n", strerror(errno));
-                exit(1);
-            } else {
-                close(fd[0]);
-                close(fd[1]);
-                printf("%d\n", pid1);
-                printf("%d\n", pid2);
-                waitpid(pid1, &status, WUNTRACED);
-                waitpid(pid2, &status, WUNTRACED);
-            }
-        }
-    }
-
-    return 1;
-}
 
 int redirect(int left, int right, char **argsList) {
     /*
