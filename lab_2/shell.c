@@ -311,6 +311,26 @@ int redirect(int left, int right, char **argsList) {
 
     pid_t pid;
     int status;
+    /* extract command and arguments from argsList */
+    int pivot;
+    if (left == -1) { // no input just output
+        pivot = right;
+    } else if (right > left) {
+        /* command arguments < some_file > some_other_file */
+        pivot = left;
+    } else if (right == -1) { // no output just input
+        pivot = left;
+    } else {
+        /* command arguments > some_file < some_other_file */
+        pivot = right;
+    }
+
+    char *args[pivot];
+    int i = 0;
+    for (; i < pivot; i++) {
+        args[i] = argsList[i];
+    }
+    args[i] = NULL;
 
     if ((pid = fork()) == -1) {
         fprintf(stderr, "fork error %s \n", strerror(errno));
@@ -321,6 +341,7 @@ int redirect(int left, int right, char **argsList) {
             int fd1;
             if ((fd1 = open(input, O_RDONLY, 00755)) == -1) {
                 fprintf(stderr, "error openning file %s %s\n", input, strerror(errno));
+                exit(1);
             }
             dup2(fd1, STDIN_FILENO);
         }
@@ -328,32 +349,20 @@ int redirect(int left, int right, char **argsList) {
         if (right != -1) {
             char *output = argsList[right + 1];
             int fd2;
-            if ((fd2 = open(output, O_RDWR | O_CREAT | O_TRUNC, 00755)) == -1) {
-                fprintf(stderr, "error openning file %s %s\n", output, strerror(errno));
+
+            if (strcmp(argsList[right], ">>") == 0) {
+                if ((fd2 = open(output, O_RDWR | O_CREAT | O_APPEND, 00755)) == -1) {
+                    fprintf(stderr, "error openning file %s %s\n", output, strerror(errno));
+                    exit(1);
+                }
+            } else {
+                if ((fd2 = open(output, O_RDWR | O_CREAT | O_TRUNC, 00755)) == -1) {
+                    fprintf(stderr, "error openning file %s %s\n", output, strerror(errno));
+                    exit(1);
+                }
             }
             dup2(fd2, STDOUT_FILENO);
         }
-
-        /* extract command and arguments from argsList */
-        int pivot;
-        if (left == -1) { // no input just output
-            pivot = right;
-        } else if (right > left) {
-            /* command arguments < some_file > some_other_file */
-            pivot = left;
-        } else if (right == -1) { // no output just input
-            pivot = left;
-        } else {
-            /* command arguments > some_file < some_other_file */
-            pivot = right;
-        }
-
-        char *args[pivot];
-        int i = 0;
-        for (; i < pivot; i++) {
-            args[i] = argsList[i];
-        }
-        args[i] = NULL;
 
         int index;
         if ((index = detect_builtins(args[0])) != -1) {
@@ -396,7 +405,7 @@ int execute_parallel(char **args1, char **args2) {
         }
     } else {
         if ((index = detect_builtins(args2[0])) != -1) {
-          builtin_commands[index](args2);
+            builtin_commands[index](args2);
         } else {
             if ((pid2 = fork()) == -1) {
                 fprintf(stderr, "fork error %s\n", strerror(errno));
