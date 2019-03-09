@@ -65,7 +65,7 @@ int detect_left(char **argsList) {
 int detect_right(char **argsList) {
     int i = 0;
 
-    while (strcmp(argsList[i], ">") != 0) {
+    while ((strcmp(argsList[i], ">") != 0) && (strcmp(argsList[i], ">>") != 0)) {
         i++;
         if (argsList[i] == NULL) {
             return -1;
@@ -83,3 +83,4 @@ int detect_parallel(char **argsList) {
     }
     return -1;
 }
+

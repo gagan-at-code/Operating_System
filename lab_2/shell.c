@@ -136,7 +136,7 @@ int execute_command(char **argsList) {
     int left = -1;
     int right = -1;
     if ((index = detect_pipe(argsList)) != -1) {
-        /* create two arrays of arguments */
+        
         int indices[n];
         int j = 0;
         for (int i = 0; i < n; i++) {
@@ -144,8 +144,10 @@ int execute_command(char **argsList) {
                 indices[j++] = i;
             }
         }
-        status = execute_pipe_new(argsList, indices, j);
+        status = execute_pipe_new(argsList, indices, j, n);
+        
 
+        /* create two arrays of arguments */
         /*
         char *args1[index];
         char *args2[(n - index)];
@@ -242,28 +244,106 @@ int execute_external_command(char **argsList, int bg) {
 Advance features
 */
 
+int execute_pipe_new(char **argsList, int *indices, int n_pipes, int n_args) {
+    /*
+    arguments:
+    argsList is an array of arguments from user
+    indices is an array containing indices of pipe in argsList
+    n_pipes is the number of pipe
+    n_args is the number of arguments
+    execute n pipe(s)
+    return: 1
+    */
 
-int execute_pipe_new(char **argsList, int *indices, int n) {
     int next;
+    int status;
+    int index;
     pid_t pid;
-    int fd[(2*n)];
-    int last = 0;
+    pid_t lPID[(n_pipes + 1)];
+    int newfd[2];
+    int oldfd[2];
+    /* even indices are the read-ends and odd indices are the write-ends */
+    int start = 0; // starting indices of a command in argsList
+    int n_cmds = n_pipes + 1;
 
-    size_t size = sizeof(indices) / sizeof(indices[0]);
-    for (int i = 0; i < size; i++) {
-        if (pipe(fd + i * 2) == -1) {
-            fprintf(stderr, "pipe error %s\n", strerror(errno));
+    for (int i = 0; i < n_cmds; i++) {
+        /* create a new pipe */
+        if (pipe(newfd) == -1) {
+            fprintf(stderr, "pipe error %s", strerror(errno));
+            return 1;
         }
 
-        /* create the next array of arguments */
-        next = indices[i];
-        char *args[(next - last)];
-        int k = 0;
-        for (; k < (next-last); k++) {
-            args[k] = argsList[k + last];
+        /* get the next array of arguments */
+        char *args[n_args];
+        if (i < n_pipes) {
+            /* Not the last command */
+            next = indices[i]; // get next appearance of |
+            int k = 0;
+            for (; k < (next - start); k++) {
+                args[k] = argsList[k + start];
+            }
+            args[k] = NULL;
+            start = next + 1; // update the starting point for the next command
+        } else {
+            /* the last command */
+            int k = 0;
+            for (; k < (n_args - start); k++) {
+                args[k] = argsList[k + start];
+            }
+            args[k] = NULL;
         }
-        args[k] = NULL;
+
+        /* fork */
+        if ((pid = fork()) == -1) {
+            fprintf(stderr, "fork error %s", strerror(errno));
+        } else if (pid == 0) {
+            /* in the child, perform redirection */
+            if (i != 0) {
+                /* if not the first command, get input from the previous command */
+                close(oldfd[1]);
+                dup2(oldfd[0], STDIN_FILENO);
+                close(oldfd[0]);
+            }
+
+            if (i < n_pipes) {
+                /* if not the last command, output to the next command */
+                close(newfd[0]);
+                dup2(newfd[1], STDOUT_FILENO);
+                close(newfd[1]);
+            }
+
+            if (i == 0 && (index = detect_builtins(args[0])) != -1) {
+                builtin_commands[index](args);
+                exit(0);
+            } else {
+                execvp(args[0], args);
+                fprintf(stderr, "failed to execute command %d %s", (i + 1), strerror(errno));
+                exit(1);
+            }
+        } else {
+            /* In the parent */
+            if (i != 0) {
+                /* if there is a previouse command, close oldfd */
+                close(oldfd[0]);
+                close(oldfd[1]);
+            }
+            if (i < n_pipes) {
+                /* if there is a next command */
+                oldfd[0] = newfd[0];
+                oldfd[1] = newfd[1];
+            }
+            lPID[i] = pid;
+        }
     }
+
+    close(newfd[0]);
+    close(newfd[1]);
+
+    for (int j = 0; j < n_pipes + 1; j++) {
+        waitpid(lPID[j], &status, WUNTRACED);
+        printf("%d\n", lPID[j]);
+    }
+
     return 1;
 }
 
@@ -277,7 +357,8 @@ int execute_pipe(char **args1, char **args2) {
     int fd[2];
     int index;
     int status;
-    pid_t pid;
+    pid_t pid1;
+    pid_t pid2;
 
     if (pipe(fd) == -1) {
         fprintf(stderr, "pipe error %s\n", strerror(errno));
@@ -289,9 +370,9 @@ int execute_pipe(char **args1, char **args2) {
         Hence we just need to check if args1[0] is a builtin
         */
 
-        if ((pid = fork()) == -1) {
+        if ((pid1 = fork()) == -1) {
             fprintf(stderr, "fork error %s\n", strerror(errno));
-        } else if (pid == 0) {
+        } else if (pid1 == 0) {
             /*
             At the child process, we close the read-end, duplicate the write-end into STDOUT_FILENO
             Then we check if args1[0] is builtin, if it is, call the builtin and
@@ -318,9 +399,9 @@ int execute_pipe(char **args1, char **args2) {
             reap the child process.
             */
 
-            if ((pid = fork()) == -1) {
+            if ((pid2 = fork()) == -1) {
                 fprintf(stderr, "fork error %s\n", strerror(errno));
-            } else if (pid == 0) {
+            } else if (pid2 == 0) {
                 close(fd[1]);
                 dup2(fd[0], STDIN_FILENO);
                 close(fd[0]);
@@ -330,7 +411,10 @@ int execute_pipe(char **args1, char **args2) {
             } else {
                 close(fd[0]);
                 close(fd[1]);
-                waitpid(pid, &status, WUNTRACED);
+                printf("%d\n", pid1);
+                printf("%d\n", pid2);
+                waitpid(pid1, &status, WUNTRACED);
+                waitpid(pid2, &status, WUNTRACED);
             }
         }
     }
@@ -348,49 +432,63 @@ int redirect(int left, int right, char **argsList) {
     pid_t pid;
     int status;
 
+    /* extract command and arguments from argsList */
+    int pivot;
+    if (left == -1) { // no input just output
+        pivot = right;
+    } else if (right > left) {
+        /* command arguments < some_file > some_other_file */
+        pivot = left;
+    } else if (right == -1) { // no output just input
+        pivot = left;
+    } else {
+        /* command arguments > some_file < some_other_file */
+        pivot = right;
+    }
+
+    /* create a new array to store command and arguments */
+    char *args[pivot];
+    int i = 0;
+    for (; i < pivot; i++) {
+        args[i] = argsList[i];
+    }
+    args[i] = NULL;
+
     if ((pid = fork()) == -1) {
         fprintf(stderr, "fork error %s \n", strerror(errno));
     } else if (pid == 0) {
         /* In the child process, we open the file(s), perform I/O redirection and exec */
         if (left != -1) {
+            /* open file for input */
             char *input = argsList[left + 1];
             int fd1;
             if ((fd1 = open(input, O_RDONLY, 00755)) == -1) {
                 fprintf(stderr, "error openning file %s %s\n", input, strerror(errno));
+                exit(1);
             }
             dup2(fd1, STDIN_FILENO);
         }
 
         if (right != -1) {
+            /* open file for output */
             char *output = argsList[right + 1];
             int fd2;
-            if ((fd2 = open(output, O_RDWR | O_CREAT | O_TRUNC, 00755)) == -1) {
-                fprintf(stderr, "error openning file %s %s\n", output, strerror(errno));
+
+            if (strcmp(argsList[right], ">>") == 0) {
+                if ((fd2 = open(output, O_RDWR | O_CREAT | O_APPEND, 00755)) == -1) {
+                    fprintf(stderr, "error openning file %s %s\n", output, strerror(errno));
+                    exit(1);
+                }
+            } else {
+                if ((fd2 = open(output, O_RDWR | O_CREAT | O_TRUNC, 00755)) == -1) {
+                    fprintf(stderr, "error openning file %s %s\n", output, strerror(errno));
+                    exit(1);
+                }
             }
             dup2(fd2, STDOUT_FILENO);
         }
 
-        /* extract command and arguments from argsList */
-        int pivot;
-        if (left == -1) { // no input just output
-            pivot = right;
-        } else if (right > left) {
-            /* command arguments < some_file > some_other_file */
-            pivot = left;
-        } else if (right == -1) { // no output just input
-            pivot = left;
-        } else {
-            /* command arguments > some_file < some_other_file */
-            pivot = right;
-        }
-
-        char *args[pivot];
-        int i = 0;
-        for (; i < pivot; i++) {
-            args[i] = argsList[i];
-        }
-        args[i] = NULL;
-
+        /* call builtin command if the command is builtin or else execvp */
         int index;
         if ((index = detect_builtins(args[0])) != -1) {
             builtin_commands[index](args);
@@ -432,7 +530,7 @@ int execute_parallel(char **args1, char **args2) {
         }
     } else {
         if ((index = detect_builtins(args2[0])) != -1) {
-          builtin_commands[index](args2);
+            builtin_commands[index](args2);
         } else {
             if ((pid2 = fork()) == -1) {
                 fprintf(stderr, "fork error %s\n", strerror(errno));
