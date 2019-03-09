@@ -136,10 +136,11 @@ int execute_command(char **argsList) {
     int left = -1;
     int right = -1;
     if ((index = detect_pipe(argsList)) != -1) {
-        
+        /* get the indices of the pipe character in argsList */
         int indices[n];
-        int j = 0;
-        for (int i = 0; i < n; i++) {
+        indices[0] = index;
+        int j = 1;
+        for (int i = index + 1; i < n; i++) {
             if (strcmp(argsList[i], "|") == 0) {
                 indices[j++] = i;
             }
@@ -149,6 +150,7 @@ int execute_command(char **argsList) {
         status = redirect(left, right, argsList);
     } else if ((index = detect_parallel(argsList)) != -1) {
         /* create two arrays of arguments */
+        /*
         char *args1[index];
         char *args2[(n - index)];
 
@@ -165,6 +167,18 @@ int execute_command(char **argsList) {
         args2[j] = NULL;
 
         status = execute_parallel(args1, args2);
+        */
+
+        /* get the indices of the pipe character in argsList */
+        int indices[n];
+        indices[0] = index;
+        int j = 1;
+        for (int i = index + 1; i < n - 1; i++) {
+            if (strcmp(argsList[i], "&") == 0) {
+                indices[j++] = i;
+            }
+        }
+        status = execute_parallel_new(argsList, indices, (j + 1), n);
     } else {
         if ((index = detect_builtins(argsList[0])) != -1) {
             if (bg) {
@@ -325,7 +339,6 @@ int execute_pipe(char **argsList, int *indices, int n_pipes, int n_args) {
     return 1;
 }
 
-
 int redirect(int left, int right, char **argsList) {
     /*
     arguments:
@@ -406,7 +419,6 @@ int redirect(int left, int right, char **argsList) {
         /* In the parent process, we wait and reap the child */
         waitpid(pid, &status, WUNTRACED);
     }
-
     return 1;
 }
 
@@ -433,17 +445,95 @@ int execute_parallel(char **args1, char **args2) {
             exit(1);
         }
     } else {
-        if ((index = detect_builtins(args2[0])) != -1) {
-            builtin_commands[index](args2);
-        } else {
-            if ((pid2 = fork()) == -1) {
-                fprintf(stderr, "fork error %s\n", strerror(errno));
-            } else if (pid2 == 0) {
+        if ((pid2 = fork()) == -1) {
+            fprintf(stderr, "fork error %s \n", strerror(errno));
+        } else if (pid2 == 0) {
+            if ((index = detect_builtins(args2[0])) != -1) {
+                builtin_commands[index](args2);
+                exit(0);
+            } else {
                 execvp(args2[0], args2);
                 fprintf(stderr, "failed to execute command 2: %s\n", strerror(errno));
                 exit(1);
+            }
+        } else {
+            waitpid(pid2, &status, WUNTRACED);
+        }
+    }
+    return 1;
+}
+
+int execute_parallel_new(char **argsList, int *indices, int n_procs, int n_args) {
+    /*
+     arguments:
+     argsList is an array of arguments from user
+     indices is an array containing indices of pipe in argsList
+     n_procs is the number of parallel processes
+     n_args is the number of arguments
+     execute n parallel processes
+     return: 1
+     */
+
+    int next = 0;
+    int status;
+    int index;
+    pid_t pid;
+    /* even indices are the read-ends and odd indices are the write-ends */
+    int start = 0; // starting indices of a command in argsList
+
+    for (int i = 0; i < n_procs; i++) {
+        /* get the next array of arguments */
+        char *args[n_args];
+        if (i < (n_procs - 1)) {
+            /* Not the last command */
+            next = indices[i]; // get next appearance of |
+            int k = 0;
+            for (; k < (next - start); k++) {
+                args[k] = argsList[k + start];
+            }
+            args[k] = NULL;
+            start = next + 1; // update the starting point for the next command
+        } else {
+            /* the last command */
+            int k = 0;
+            for (; k < (n_args - start); k++) {
+                args[k] = argsList[k + start];
+            }
+            args[k] = NULL;
+        }
+
+        /* fork */
+        if (i < (n_procs - 1)) {
+            /* if not the last command */
+            if ((pid = fork()) == -1) {
+                fprintf(stderr, "fork error %s", strerror(errno));
+            } else if (pid == 0) {
+                /* in the child, execute command */
+                if ((index = detect_builtins(args[0])) != -1) {
+                    builtin_commands[index](args);
+                    exit(0);
+                } else {
+                    execvp(args[0], args);
+                    fprintf(stderr, "failed to execute command %d %s", (i + 1), strerror(errno));
+                    exit(1);
+                }
+            }
+        } else {
+            /* if the last command */
+            if ((index = detect_builtins(args[0])) != -1) {
+                /* call builtin if the last command is builtin and don't exit */
+                builtin_commands[index](args);
             } else {
-                waitpid(pid2, &status, WUNTRACED);
+                pid_t pid1;
+                if ((pid1 = fork()) == -1) {
+                    fprintf(stderr, "fork error %s \n", strerror(errno));
+                } else if (pid1 == 0) {
+                    execvp(args[0], args);
+                    fprintf(stderr, "failed to execute command 2: %s\n", strerror(errno));
+                    exit(1);
+                } else {
+                    waitpid(pid1, &status, WUNTRACED);
+                }
             }
         }
     }
