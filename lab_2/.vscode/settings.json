@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "shell.h": "c",
+        "stat.h": "c",
+        "errno.h": "c",
+        "param.h": "c"
+    }
+}
