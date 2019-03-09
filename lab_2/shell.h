@@ -34,6 +34,7 @@ char **parse_command(char *command);
 int execute_command(char **argsList);
 int execute_external_command(char **argsList, int bg);
 int execute_pipe(char **args1, char **args2);
+int execute_pipe_new(char **argsList, int *indices, int n);
 int redirect(int left, int right, char **argsList);
 int execute_parallel(char **args1, char **args2);
 

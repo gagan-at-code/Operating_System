@@ -137,6 +137,16 @@ int execute_command(char **argsList) {
     int right = -1;
     if ((index = detect_pipe(argsList)) != -1) {
         /* create two arrays of arguments */
+        int indices[n];
+        int j = 0;
+        for (int i = 0; i < n; i++) {
+            if (strcmp(argsList[i], "|") == 0) {
+                indices[j++] = i;
+            }
+        }
+        status = execute_pipe_new(argsList, indices, j);
+
+        /*
         char *args1[index];
         char *args2[(n - index)];
 
@@ -153,6 +163,7 @@ int execute_command(char **argsList) {
         args2[j] = NULL;
 
         status = execute_pipe(args1, args2);
+        */
     } else if ((left = detect_left(argsList)) != -1 | (right = detect_right(argsList)) != -1) {
         status = redirect(left, right, argsList);
     } else if ((index = detect_parallel(argsList)) != -1) {
@@ -230,6 +241,31 @@ int execute_external_command(char **argsList, int bg) {
 /*
 Advance features
 */
+
+
+int execute_pipe_new(char **argsList, int *indices, int n) {
+    int next;
+    pid_t pid;
+    int fd[(2*n)];
+    int last = 0;
+
+    size_t size = sizeof(indices) / sizeof(indices[0]);
+    for (int i = 0; i < size; i++) {
+        if (pipe(fd + i * 2) == -1) {
+            fprintf(stderr, "pipe error %s\n", strerror(errno));
+        }
+
+        /* create the next array of arguments */
+        next = indices[i];
+        char *args[(next - last)];
+        int k = 0;
+        for (; k < (next-last); k++) {
+            args[k] = argsList[k + last];
+        }
+        args[k] = NULL;
+    }
+    return 1;
+}
 
 int execute_pipe(char **args1, char **args2) {
     /*
@@ -409,6 +445,5 @@ int execute_parallel(char **args1, char **args2) {
             }
         }
     }
-
     return 1;
 }
