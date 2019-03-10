@@ -10,7 +10,7 @@ TODOs:
 
 3. TAKE CARE OF BACKGROUND PROCESSES (DONE)
 
-4. TAKE CARE OF PARALLEL COMMAND
+4. TAKE CARE OF PARALLEL COMMAND (DONE)
 
 5. TAKE CARE OF BATCH MODE
 */
@@ -20,6 +20,8 @@ TODOs:
 int (*builtin_commands[10])(char **args) = {&cd, &clr, &dir, &env, &echo, &path, &help, &myPause, &quit};
 char *builtins[10] = {"cd", "clr", "dir", "environ", "echo", "path", "help", "pause", "quit"};
 char *PATH = "/bin";
+int changedPath = 0;
+
 
 int main() {
     shell_prog();
@@ -38,6 +40,7 @@ void shell_prog() {
     int status = 0;
     char *buf = (char *)malloc((size_t)MAXPATHLEN);
     char *ptr = NULL;
+    putenv("PATH=/bin"); // set search path
 
     do {
         /* get the current directory */
@@ -52,6 +55,9 @@ void shell_prog() {
         terminates to be immediately removed from the system instead of being converted into a zombie. */
         signal(SIGCHLD, SIG_IGN);
     } while (status);
+    if (changedPath) {
+        free(PATH);
+    }
 }
 
 char *read_command(void) {

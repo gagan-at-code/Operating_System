@@ -61,9 +61,39 @@ int echo(char **args) {
 }
 
 int path(char **args) {
+    if (changedPath) {
+        /* if we have changed PATH, free the calloc */
+        free(PATH);
+        changedPath = 0;
+    }
     if (args[1] == NULL) {
         PATH = "";
+        if (putenv("PATH=\"\"")) {
+            fprintf(stderr, "failed setting path %s", strerror(errno));
+        }
     } else {
+        int totalLen = 6;
+        int i = 1;
+        while(args[i] != NULL) {
+            totalLen += strlen(args[i]);
+            i++;
+        }
+
+        char *p;
+        p = PATH = calloc(totalLen, sizeof(char));
+        memcpy(p, "PATH=", 6);
+        p +=5;
+        for (int j = 1; j < i; j++) {
+            memcpy(p, args[j], strlen(args[j]));
+            p += strlen(args[j]);
+            if (j < i - 1) {
+                memcpy(p, ":", 1);
+                p += 1;
+            }
+        }
+        *p = '\0';
+        putenv(PATH);
+        changedPath = 1;
     }
     return 1;
 }

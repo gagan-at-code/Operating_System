@@ -49,5 +49,6 @@ int get_len_array(char **argsList);
 
 extern char *PATH;
 extern char *builtins[10];
+extern int changedPath;
 
 
