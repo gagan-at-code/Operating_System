@@ -22,9 +22,15 @@ char *builtins[10] = {"cd", "clr", "dir", "environ", "echo", "path", "help", "pa
 char *PATH = "/bin";
 int changedPath = 0;
 
-
-int main() {
-    shell_prog();
+int main(int argc, char **argv) {
+    /*the isatty() function shall test whether an open file descriptor, is associated with a terminal device.*/
+    if (argv[1] == NULL) {
+        /* interactive mode */
+        shell_prog();
+    } else {
+        /* batch mode */
+        batch_shell(argv[1]);
+    }
     return EXIT_SUCCESS;
 }
 
@@ -49,15 +55,49 @@ void shell_prog() {
         command = read_command();
         argsList = parse_command(command);
         status = execute_command(argsList);
-        free(command);
-        free(argsList);
         /* Explicitly setting the disposition of SIGCHLD to SIG_IGN causes any child process that subsequently
         terminates to be immediately removed from the system instead of being converted into a zombie. */
+        free(command);
+        free(argsList);
         signal(SIGCHLD, SIG_IGN);
     } while (status);
     if (changedPath) {
         free(PATH);
     }
+}
+
+int batch_shell(char *filename) {
+    /* argument: filename - batch file containing commands to run
+
+    */
+    FILE *fp;
+    char *command = NULL;
+    size_t bufsize = 0;
+    ssize_t read;
+    char **argsList;
+    int status;
+
+    fp = fopen(filename, "r");
+    if (fp == NULL) {
+        return EXIT_FAILURE;
+    }
+
+    while ((read = getline(&command, &bufsize, fp)) != -1) {
+        puts(command);
+        argsList = parse_command(command);
+        status = execute_command(argsList);
+        command = NULL;
+        bufsize = 0;
+        sleep(1);
+    }
+    free(command);
+    free(argsList);
+    signal(SIGCHLD, SIG_IGN);
+    if (changedPath) {
+        free(PATH);
+    }
+    fclose(fp);
+    return EXIT_SUCCESS;
 }
 
 char *read_command(void) {
@@ -70,10 +110,7 @@ char *read_command(void) {
     size_t bufsize = 0;
 
     /*
-    getline reads an entire line from stdin, storing the address of the
-    buffer containing the text into command. Since command is set to NULL
-    and bufsize is set to 0 before the call, getline will allocate a buffer
-    for storing the line
+    getline reads an entire line from stdin, storing the address of the buffer containing the text into command.
     */
 
     if (getline(&command, &bufsize, stdin) == -1) {
@@ -94,8 +131,7 @@ char **parse_command(char *command) {
     char **argsList = malloc(sizeof(char *) * argsLen);
 
     if (strcmp(command, "\n") == 0) {
-        // if the user returns without any command, set the first
-        // element in argsList to the empty string
+        /* if the user returns without any command, set the first element in argsList to the empty string */
         argsList[0] = "";
     } else {
         const char *delim = " \"\t\n";
@@ -105,8 +141,7 @@ char **parse_command(char *command) {
             argsList[i++] = arg;
             arg = strtok(NULL, delim);
             if (i > argsLen) {
-                // if we have more arguments than slots in
-                // argsList, extend argsList by reallocating it
+                /* if we have more arguments than slots in argsList, extend argsList by reallocating it */
                 argsLen += bufsize;
                 argsList = realloc(argsList, argsLen);
             }
@@ -153,9 +188,10 @@ int execute_command(char **argsList) {
         }
         status = execute_pipe(argsList, indices, j, n);
     } else if ((left = detect_left(argsList)) != -1 | (right = detect_right(argsList)) != -1) {
+        /* If have I/O redirection, call handler function */
         status = redirect(left, right, argsList);
     } else if ((index = detect_parallel(argsList)) != -1) {
-        /* get the indices of the pipe character in argsList */
+        /* If have parallel execution, get the indices of the pipe character in argsList */
         int indices[n];
         indices[0] = index;
         int j = 1;
@@ -166,6 +202,7 @@ int execute_command(char **argsList) {
         }
         status = execute_parallel(argsList, indices, (j + 1), n);
     } else {
+        /* If usual execution */
         if ((index = detect_builtins(argsList[0])) != -1) {
             if (bg) {
                 /* if background process, we fork() and call the builtin command in the child process */
@@ -174,9 +211,9 @@ int execute_command(char **argsList) {
                 if ((pid = fork()) == -1) {
                     fprintf(stderr, "fork error %s\n", strerror(errno));
                 } else if (pid == 0) {
-                    /* In the child process, we call the
-                     * builtin command */
+                    /* In the child process, we call the builtin command */
                     status = builtin_commands[index](argsList);
+                    exit(0);
                 }
             } else {
                 status = builtin_commands[index](argsList);
@@ -408,7 +445,6 @@ int redirect(int left, int right, char **argsList) {
     return 1;
 }
 
-
 int execute_parallel(char **argsList, int *indices, int n_procs, int n_args) {
     /*
      arguments:
@@ -450,7 +486,7 @@ int execute_parallel(char **argsList, int *indices, int n_procs, int n_args) {
 
         /* fork */
         if (i < (n_procs - 1)) {
-            /* if not the last command */
+            /* if not the last command, fork */
             if ((pid = fork()) == -1) {
                 fprintf(stderr, "fork error %s", strerror(errno));
             } else if (pid == 0) {

@@ -5,8 +5,7 @@ Builtin functions
 
 TODOs:
 
-1. TAKE CARE OF PATH
-2. TAKE CARE OF HELP
+1. TAKE CARE OF HELP
 
 */
 

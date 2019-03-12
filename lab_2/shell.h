@@ -24,10 +24,12 @@ int echo(char **args);
 int path(char **args);
 int help(char **args);
 int myPause(char **args);
+int myshell();
 int quit(char **args);
 
 // handler functions
 void shell_prog();
+int batch_shell(char *filename);
 char *read_command(void);
 char **parse_command(char *command);
 int execute_command(char **argsList);
