@@ -83,16 +83,13 @@ int batch_shell(char *filename) {
     }
 
     while ((read = getline(&command, &bufsize, fp)) != -1) {
-        puts(command);
+        // printf("read command %s of length: %zu\n", command, read);
         argsList = parse_command(command);
         status = execute_command(argsList);
-        command = NULL;
-        bufsize = 0;
-        sleep(1);
+        signal(SIGCHLD, SIG_IGN);
     }
     free(command);
     free(argsList);
-    signal(SIGCHLD, SIG_IGN);
     if (changedPath) {
         free(PATH);
     }
@@ -159,7 +156,7 @@ int execute_command(char **argsList) {
     */
 
     int i = 0;
-    int status;
+    int status = 1;
     int n = get_len_array(argsList);
     if (strcmp(argsList[0], "") == 0) // if there is no command returned by user
     {
@@ -212,7 +209,7 @@ int execute_command(char **argsList) {
                     fprintf(stderr, "fork error %s\n", strerror(errno));
                 } else if (pid == 0) {
                     /* In the child process, we call the builtin command */
-                    status = builtin_commands[index](argsList);
+                    builtin_commands[index](argsList);
                     exit(0);
                 }
             } else {
@@ -221,7 +218,7 @@ int execute_command(char **argsList) {
         } else {
             /* if user doesn't call builtin command, e.g., user calls external command,
             call execute_external_command handler */
-            status = execute_external_command(argsList, bg);
+            execute_external_command(argsList, bg);
         }
     }
 
@@ -468,9 +465,9 @@ int execute_parallel(char **argsList, int *indices, int n_procs, int n_args) {
         char *args[n_args];
         if (i < (n_procs - 1)) {
             /* Not the last command */
-            next = indices[i]; // get next appearance of |
+            next = indices[i]; // get next appearance of &
             int k = 0;
-            for (; k < (next - start); k++) {
+            for (; k <= (next - start); k++) {
                 args[k] = argsList[k + start];
             }
             args[k] = NULL;
@@ -484,40 +481,7 @@ int execute_parallel(char **argsList, int *indices, int n_procs, int n_args) {
             args[k] = NULL;
         }
 
-        /* fork */
-        if (i < (n_procs - 1)) {
-            /* if not the last command, fork */
-            if ((pid = fork()) == -1) {
-                fprintf(stderr, "fork error %s", strerror(errno));
-            } else if (pid == 0) {
-                /* in the child, execute command */
-                if ((index = detect_builtins(args[0])) != -1) {
-                    builtin_commands[index](args);
-                    exit(0);
-                } else {
-                    execvp(args[0], args);
-                    fprintf(stderr, "failed to execute command %d %s", (i + 1), strerror(errno));
-                    exit(1);
-                }
-            }
-        } else {
-            /* if the last command */
-            if ((index = detect_builtins(args[0])) != -1) {
-                /* call builtin if the last command is builtin and don't exit */
-                builtin_commands[index](args);
-            } else {
-                pid_t pid1;
-                if ((pid1 = fork()) == -1) {
-                    fprintf(stderr, "fork error %s \n", strerror(errno));
-                } else if (pid1 == 0) {
-                    execvp(args[0], args);
-                    fprintf(stderr, "failed to execute command 2: %s\n", strerror(errno));
-                    exit(1);
-                } else {
-                    waitpid(pid1, &status, WUNTRACED);
-                }
-            }
-        }
+        execute_command(args);
     }
     return 1;
 }
