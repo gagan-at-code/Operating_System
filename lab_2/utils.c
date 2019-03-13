@@ -1,10 +1,6 @@
 /*
 Author: Hoang Ho
 Simple Shell Program
-
-TODOs:
-
-HELPER FUNCTIONS
 */
 
 #include "shell.h"

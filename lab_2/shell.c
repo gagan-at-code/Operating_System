@@ -2,17 +2,6 @@
 Author: Hoang Ho
 Simple Unix Shell Program
 Main Shell Program
-
-TODOs:
-1. TAKE CARE OF PIPE (DONE)
-
-2. TAKE CARE OF I/O REDIRECTION (DONE)
-
-3. TAKE CARE OF BACKGROUND PROCESSES (DONE)
-
-4. TAKE CARE OF PARALLEL COMMAND (DONE)
-
-5. TAKE CARE OF BATCH MODE
 */
 
 #include "shell.h"
@@ -64,6 +53,7 @@ void shell_prog() {
     if (changedPath) {
         free(PATH);
     }
+    free(buf);
 }
 
 int batch_shell(char *filename) {

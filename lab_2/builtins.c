@@ -2,11 +2,6 @@
 Author: Hoang Ho
 Simple Unix Shell Program
 Builtin functions
-
-TODOs:
-
-1. TAKE CARE OF HELP
-
 */
 
 #include "shell.h"
@@ -14,10 +9,25 @@ TODOs:
 extern char **environ;
 
 int cd(char **args) {
+    char *buf = (char *)malloc((size_t)MAXPATHLEN);
+    char *cwd;
     if (args[1] == NULL) {
-        fprintf(stderr, " missing directory argument\n");
+        cwd = getcwd(buf, (size_t)MAXPATHLEN);
+        printf("No directory passed in, current directory is %s\n", cwd);
     } else if (chdir(args[1]) == -1) {
         fprintf(stderr, " failed changing directory %s\n", strerror(errno));
+    } else {
+        char *p;
+        char *pwd;
+        p = pwd = calloc(1024, sizeof(char));
+        memcpy(p, "PWD=", 5);
+        p +=4;
+        cwd = getcwd(buf, (size_t)MAXPATHLEN);
+        int len = strlen(cwd);
+        memcpy(p, cwd, len);
+        p += len;
+        *p = '\0';
+        putenv(pwd);
     }
     return 1;
 }
@@ -73,7 +83,7 @@ int path(char **args) {
     } else {
         int totalLen = 6;
         int i = 1;
-        while(args[i] != NULL) {
+        while (args[i] != NULL) {
             totalLen += strlen(args[i]);
             i++;
         }
@@ -81,7 +91,7 @@ int path(char **args) {
         char *p;
         p = PATH = calloc(totalLen, sizeof(char));
         memcpy(p, "PATH=", 6);
-        p +=5;
+        p += 5;
         for (int j = 1; j < i; j++) {
             memcpy(p, args[j], strlen(args[j]));
             p += strlen(args[j]);
@@ -97,11 +107,16 @@ int path(char **args) {
     return 1;
 }
 
-int help(char **args) { return 1; }
+int help(char **args) { 
+    char *argsList[] = {"more", "help.md"};
+    execute_command(argsList);
+    return 1; 
+    }
 
 int myPause(char **args) {
     printf("Press Enter to continue . . . ");
-    while (getchar() != '\n');
+    while (getchar() != '\n')
+        ;
     return 1;
 }
 
