@@ -65,7 +65,6 @@ int batch_shell(char *filename) {
     size_t bufsize = 0;
     ssize_t read;
     char **argsList;
-    int status;
 
     fp = fopen(filename, "r");
     if (fp == NULL) {
@@ -75,7 +74,7 @@ int batch_shell(char *filename) {
     while ((read = getline(&command, &bufsize, fp)) != -1) {
         // printf("read command %s of length: %zu\n", command, read);
         argsList = parse_command(command);
-        status = execute_command(argsList);
+        execute_command(argsList);
         signal(SIGCHLD, SIG_IGN);
     }
     free(command);
@@ -145,7 +144,6 @@ int execute_command(char **argsList) {
     return: status of the execution for the command
     */
 
-    int i = 0;
     int status = 1;
     int n = get_len_array(argsList);
     if (strcmp(argsList[0], "") == 0) // if there is no command returned by user
@@ -174,7 +172,7 @@ int execute_command(char **argsList) {
             }
         }
         status = execute_pipe(argsList, indices, j, n);
-    } else if ((left = detect_left(argsList)) != -1 | (right = detect_right(argsList)) != -1) {
+    } else if (((left = detect_left(argsList)) != -1) | ((right = detect_right(argsList)) != -1)) {
         /* If have I/O redirection, call handler function */
         status = redirect(left, right, argsList);
     } else if ((index = detect_parallel(argsList)) != -1) {
@@ -444,9 +442,6 @@ int execute_parallel(char **argsList, int *indices, int n_procs, int n_args) {
      */
 
     int next = 0;
-    int status;
-    int index;
-    pid_t pid;
     /* even indices are the read-ends and odd indices are the write-ends */
     int start = 0; // starting indices of a command in argsList
 
