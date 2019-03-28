@@ -1,2 +1,3 @@
 config_to_file
 simulation
+*.dSYM
