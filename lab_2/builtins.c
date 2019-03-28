@@ -108,10 +108,11 @@ int path(char **args) {
 }
 
 int help(char **args) { 
+    /* change to the directory where you put the help.md file */
     char *argsList[] = {"more", "help.md"};
     execute_command(argsList);
     return 1; 
-    }
+}
 
 int myPause(char **args) {
     printf("Press Enter to continue . . . ");
