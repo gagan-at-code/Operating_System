@@ -236,7 +236,7 @@ Read, write and calculate statistics function
 void read_config()
 {
     FILE *f;
-    f = fopen("/Users/hoangho/Documents/document/CS/CIS3207/labs/lab_1/config.txt", "r");
+    f = fopen("./config.txt", "r");
 
     //read file into array
 

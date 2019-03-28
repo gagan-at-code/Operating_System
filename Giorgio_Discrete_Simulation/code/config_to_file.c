@@ -8,7 +8,7 @@ configuration settings
 
 int main()
 {
-    FILE *f = fopen("/Users/hoangho/Documents/document/CS/CIS3207/labs/lab_1/config.txt", "w+");
+    FILE *f = fopen("./config.txt", "w+");
     if (f == NULL)
     {
         printf("%s", "Error opening file!\n");

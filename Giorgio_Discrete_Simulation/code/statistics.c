@@ -8,7 +8,7 @@ Statistics File
 void start_log()
 {
     FILE *f;
-    f = fopen("/Users/hoangho/Documents/document/CS/CIS3207/labs/lab_1/log_statistics.txt", "w+");
+    f = fopen("./log_statistics.txt", "w+");
     if (f == NULL)
     {
         printf("Error opening file!\n");
@@ -24,7 +24,7 @@ void log_statistics(int id, int server, int arrival_time, int pop_time, int fini
                     int response_time, int process_time, int queue_len)
 {
     FILE *f;
-    f = fopen("/Users/hoangho/Documents/document/CS/CIS3207/labs/lab_1/log_statistics.txt", "a+");
+    f = fopen("./log_statistics.txt", "a+");
 
     if (f == NULL)
     {
@@ -41,7 +41,7 @@ void log_statistics(int id, int server, int arrival_time, int pop_time, int fini
 void calculate_statistics(int INIT_TIME, int FIN_TIME)
 {
     FILE *f;
-    f = fopen("/Users/hoangho/Documents/document/CS/CIS3207/labs/lab_1/log_statistics.txt", "a+");
+    f = fopen("./log_statistics.txt", "a+");
 
     if (f == NULL)
     {
@@ -53,9 +53,9 @@ void calculate_statistics(int INIT_TIME, int FIN_TIME)
     fscanf(f, "%*s %*s %*s %*s %*s %*s %*s %*s");
 
     int server;
-    int jobs_cpu;
-    int jobs_disk1;
-    int jobs_disk2;
+    int jobs_cpu = 0;
+    int jobs_disk1 = 0;
+    int jobs_disk2 = 0;
     int finished;
 
     int max_cpu_queue = 0;
