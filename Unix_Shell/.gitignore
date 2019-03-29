@@ -1,5 +1,5 @@
 *.txt
-*.&dsYM
+*.dsYM
 *.vscode
 *.zip
 shell
